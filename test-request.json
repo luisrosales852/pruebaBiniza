@@ -1,0 +1,36 @@
+{
+  "educational_level": "High School",
+  "subject": "Ciencias",
+  "context": "Enfoque práctico",
+  "number_of_questions": 10,
+  "bloom": "Understand",
+  "dok": 2,
+  "question_type": ["Multiple choice"],
+  "chunks": [
+    {
+      "id": "c1",
+      "type": "paragraph",
+      "text": "El sistema solar está compuesto por el Sol y los cuerpos celestes que orbitan a su alrededor, incluyendo ocho planetas, sus lunas, asteroides y cometas."
+    },
+    {
+      "id": "c2",
+      "type": "paragraph",
+      "text": "La fotosíntesis es el proceso mediante el cual las plantas convierten la luz solar en energía química, utilizando dióxido de carbono y agua para producir glucosa y oxígeno."
+    },
+    {
+      "id": "c3",
+      "type": "paragraph",
+      "text": "En México, la Constitución de 1917 estableció los derechos sociales, siendo pionera a nivel mundial en incluir derechos laborales y educativos."
+    },
+    {
+      "id": "c4",
+      "type": "list",
+      "text": "Los tres estados de la materia son: sólido, líquido y gaseoso."
+    },
+    {
+      "id": "c5",
+      "type": "table",
+      "text": "País | Capital | Moneda\nMéxico | Ciudad de México | Peso\nEstados Unidos | Washington D.C. | Dólar"
+    }
+  ]
+}
