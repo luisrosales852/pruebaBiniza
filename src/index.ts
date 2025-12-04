@@ -849,3 +849,219 @@ export const generateQuestionsFromDocument = onRequest(
   }
 );
 
+/**
+ * Generates mock chunks simulating Docling API response
+ * @return {Chunk[]} Mock chunks for testing
+ */
+function getMockDoclingChunks(): Chunk[] {
+  return [
+    {
+      id: "mock_chunk_1",
+      type: "title",
+      text: "El Sistema Solar",
+      page: 1,
+    },
+    {
+      id: "mock_chunk_2",
+      type: "paragraph",
+      text: `El sistema solar es el sistema planetario que incluye al Sol y
+      todos los objetos que orbitan a su alrededor. Está compuesto por ocho
+      planetas: Mercurio, Venus, Tierra, Marte, Júpiter, Saturno, Urano y
+      Neptuno. Los cuatro planetas interiores son rocosos y pequeños, mientras
+      que los cuatro exteriores son gigantes gaseosos.`,
+      page: 1,
+    },
+    {
+      id: "mock_chunk_3",
+      type: "title",
+      text: "Los Planetas Interiores",
+      page: 2,
+    },
+    {
+      id: "mock_chunk_4",
+      type: "paragraph",
+      text: `Los planetas interiores, también conocidos como planetas
+      terrestres, son Mercurio, Venus, Tierra y Marte. Estos planetas tienen
+      superficies sólidas compuestas principalmente de rocas y metales. La
+      Tierra es el único planeta conocido que alberga vida, gracias a su
+      atmósfera rica en oxígeno y la presencia de agua líquida.`,
+      page: 2,
+    },
+    {
+      id: "mock_chunk_5",
+      type: "list",
+      text: `Características de los planetas terrestres:
+      - Tamaño relativamente pequeño
+      - Superficies sólidas y rocosas
+      - Pocas o ninguna luna
+      - Sin sistemas de anillos
+      - Atmósferas delgadas o inexistentes (excepto Venus y Tierra)`,
+      page: 3,
+    },
+    {
+      id: "mock_chunk_6",
+      type: "title",
+      text: "Los Planetas Exteriores",
+      page: 4,
+    },
+    {
+      id: "mock_chunk_7",
+      type: "paragraph",
+      text: `Los planetas exteriores son Júpiter, Saturno, Urano y Neptuno.
+      Estos gigantes gaseosos son mucho más grandes que los planetas
+      terrestres y están compuestos principalmente de hidrógeno y helio.
+      Júpiter es el más grande de todos los planetas, con un diámetro de
+      aproximadamente 139,820 kilómetros.`,
+      page: 4,
+    },
+    {
+      id: "mock_chunk_8",
+      type: "table",
+      text: `Comparación de planetas:
+      | Planeta | Tipo | Diámetro (km) | Lunas |
+      |---------|------|---------------|-------|
+      | Tierra  | Terrestre | 12,742 | 1 |
+      | Júpiter | Gaseoso | 139,820 | 79 |
+      | Saturno | Gaseoso | 116,460 | 82 |`,
+      page: 5,
+    },
+  ];
+}
+
+/**
+ * MOCK ENDPOINT: Simulates document processing without calling Docling API
+ * Use this for testing and development without consuming external API quota
+ */
+export const generateQuestionsFromDocumentMock = onRequest(
+  async (request, response) => {
+    try {
+      const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
+
+      const {
+        educational_level = "High School",
+        subject = "Ciencias - Astronomía",
+        context = "Enfoque educativo general",
+        number_of_questions = 10,
+        bloom = "Understand",
+        dok = 2,
+        question_type = ["Multiple choice"],
+      } = request.body || {};
+
+      // Obtener chunks simulados (sin llamar a Docling API)
+      const chunks = getMockDoclingChunks();
+
+      console.log(`[MOCK] Procesando ${chunks.length} chunks simulados`);
+
+      const questionTypes = Array.isArray(question_type) ?
+        question_type :
+        [question_type];
+
+      // Distribuir preguntas entre chunks
+      const questionsPerChunk =
+        Math.floor(number_of_questions / chunks.length);
+      const remainder = number_of_questions % chunks.length;
+
+      const allQuestions: GeneratedQuestion[] = [];
+      const chunkResults: {
+        chunk_id: string;
+        questions_generated: number;
+        status: string;
+      }[] = [];
+
+      // Procesar cada chunk
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const questionsForThisChunk =
+          questionsPerChunk + (i < remainder ? 1 : 0);
+
+        if (questionsForThisChunk === 0) {
+          chunkResults.push({
+            chunk_id: chunk.id,
+            questions_generated: 0,
+            status: "skipped",
+          });
+          continue;
+        }
+
+        try {
+          const result = await generateQuestionsForContent(
+            model,
+            chunk.text,
+            {
+              educational_level,
+              subject,
+              context,
+              number_of_questions: questionsForThisChunk,
+              bloom,
+              dok,
+              question_type: questionTypes,
+            }
+          );
+
+          const questionsWithMetadata = result.questions.map(
+            (q: GeneratedQuestion) => ({
+              ...q,
+              source: {
+                chunk_id: chunk.id,
+                chunk_type: chunk.type,
+                page: chunk.page,
+              },
+            })
+          );
+
+          allQuestions.push(...questionsWithMetadata);
+          chunkResults.push({
+            chunk_id: chunk.id,
+            questions_generated: result.questions.length,
+            status: "success",
+          });
+        } catch (error) {
+          console.error(`[MOCK] Error en chunk ${chunk.id}:`, error);
+          chunkResults.push({
+            chunk_id: chunk.id,
+            questions_generated: 0,
+            status: "error",
+          });
+          // Continuar con siguiente chunk
+        }
+      }
+
+      // Verificar que se generaron preguntas
+      if (allQuestions.length === 0) {
+        response.status(500).json({
+          success: false,
+          error: "No se pudieron generar preguntas de los chunks mock",
+          chunk_results: chunkResults,
+        });
+        return;
+      }
+
+      response.json({
+        success: true,
+        metadata: {
+          source: "mock_docling",
+          document_type: "simulated_pdf",
+          educational_level,
+          subject,
+          bloom,
+          dok,
+          question_types: questionTypes,
+          total_questions: allQuestions.length,
+          total_chunks: chunks.length,
+          chunk_results: chunkResults,
+        },
+        data: {
+          questions: allQuestions,
+        },
+      });
+    } catch (error) {
+      console.error("[MOCK] Error:", error);
+      response.status(500).json({
+        success: false,
+        error: "Error al procesar documento mock",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
